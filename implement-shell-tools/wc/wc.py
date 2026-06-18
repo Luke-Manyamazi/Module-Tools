@@ -1,33 +1,51 @@
 import argparse
+import sys
 
 def wc(path, count_lines, count_words, count_bytes):
     """Count lines, words, and bytes for a single file."""
     try:
         with open(path, 'r') as f:
             content = f.read()
+
         lines = content.splitlines()
         words = content.split()
-        bytes_ = len(content.encode('utf-8'))
 
-        # Determine what to show
+        line_count = len(lines)
+        word_count = len(words)
+        byte_count = len(content.encode('utf-8'))
+
         if not any([count_lines, count_words, count_bytes]):
-            count_lines = count_words = count_bytes = True
+            count_lines = True
+            count_words = True
+            count_bytes = True
 
         parts = []
-        if count_lines: parts.append(str(len(lines)))
-        if count_words: parts.append(str(len(words)))
-        if count_bytes: parts.append(str(bytes_))
+
+        if count_lines:
+            parts.append(str(line_count))
+
+        if count_words:
+            parts.append(str(word_count))
+
+        if count_bytes:
+            parts.append(str(byte_count))
 
         print(' '.join(parts), path)
 
-        return (len(lines) if count_lines else 0,
-                len(words) if count_words else 0,
-                bytes_ if count_bytes else 0)
+        return line_count, word_count, byte_count
+
     except FileNotFoundError:
-        print(f"wc: {path}: No such file or directory")
+        print(
+            f"wc: {path}: No such file or directory",
+            file=sys.stderr
+        )
         return (0, 0, 0)
+
     except IsADirectoryError:
-        print(f"wc: {path}: Is a directory")
+        print(
+            f"wc: {path}: Is a directory",
+            file=sys.stderr
+        )
         return (0, 0, 0)
 
 def main():
@@ -38,8 +56,12 @@ def main():
     parser.add_argument('paths', nargs='+', help='Files to count')
     args = parser.parse_args()
 
-    total_lines = total_words = total_bytes = 0
+    total_lines = 0
+    total_words = 0
+    total_bytes = 0
+
     multiple_files = len(args.paths) > 1
+    show_all = not any([args.l, args.w, args.c])
 
     for path in args.paths:
         l, w, b = wc(path, args.l, args.w, args.c)
@@ -49,9 +71,16 @@ def main():
 
     if multiple_files:
         parts = []
-        if args.l or not any([args.l, args.w, args.c]): parts.append(str(total_lines))
-        if args.w or not any([args.l, args.w, args.c]): parts.append(str(total_words))
-        if args.c or not any([args.l, args.w, args.c]): parts.append(str(total_bytes))
+
+        if args.l or show_all:
+            parts.append(str(total_lines))
+
+        if args.w or show_all:
+            parts.append(str(total_words))
+
+        if args.c or show_all:
+            parts.append(str(total_bytes))
+
         print(' '.join(parts), 'total')
 
 if __name__ == "__main__":
