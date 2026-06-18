@@ -1,4 +1,5 @@
 import argparse
+import sys
 from enum import Enum
 
 class Numbering(Enum):
@@ -25,11 +26,16 @@ def cat(filepath, numbering, start_line):
                 else:
                     print(line, end='')
     except FileNotFoundError:
-        print(f"cat: {filepath}: No such file or directory")
+        print(
+            f"cat: {filepath}: No such file or directory",
+            file=sys.stderr
+        )
     return line_number
 
 def main():
-    parser = argparse.ArgumentParser(description="Concatenate files and print on the standard output.")
+    parser = argparse.ArgumentParser(
+        description="Concatenate files and print on the standard output."
+    )
     parser.add_argument('-n', action='store_true', help='number all output lines')
     parser.add_argument('-b', action='store_true', help='number non-empty output lines')
     parser.add_argument('files', nargs='+', help='files to concatenate')
@@ -44,7 +50,8 @@ def main():
     else:
         numbering = Numbering.NONE
 
-    line_number = 1  # start line numbering
+    line_number = 1
+
     for file in args.files:
         line_number = cat(file, numbering=numbering, start_line=line_number)
 
