@@ -2,43 +2,84 @@ import argparse
 import sys
 from enum import Enum
 
+
 class Numbering(Enum):
     NONE = 0
     ALL = 1
     NONEMPTY = 2
 
+
 def print_numbered_line(line, line_number, pad=6):
-    print(f"{line_number:{pad}}\t{line}", end='')
-    return line_number + 1
+    print(f"{line_number:{pad}}\t{line}", end="")
+
 
 def cat(filepath, numbering, start_line):
     line_number = start_line
+
     try:
-        with open(filepath) as f:
-            for line in f:
-                if numbering == Numbering.NONEMPTY:
-                    if line.strip():
-                        line_number = print_numbered_line(line, line_number)
-                    else:
-                        print(line, end='')
-                elif numbering == Numbering.ALL:
-                    line_number = print_numbered_line(line, line_number)
+        with open(filepath) as file:
+            for line in file:
+                should_number = (
+                    numbering == Numbering.ALL
+                    or (
+                        numbering == Numbering.NONEMPTY
+                        and line.strip("\n")
+                    )
+                )
+
+                if should_number:
+                    print_numbered_line(line, line_number)
+                    line_number += 1
                 else:
-                    print(line, end='')
+                    print(line, end="")
+
     except FileNotFoundError:
         print(
             f"cat: {filepath}: No such file or directory",
-            file=sys.stderr
+            file=sys.stderr,
         )
-    return line_number
+        return line_number, False
+
+    except IsADirectoryError:
+        print(
+            f"cat: {filepath}: Is a directory",
+            file=sys.stderr,
+        )
+        return line_number, False
+
+    except PermissionError:
+        print(
+            f"cat: {filepath}: Permission denied",
+            file=sys.stderr,
+        )
+        return line_number, False
+
+    return line_number, True
+
 
 def main():
     parser = argparse.ArgumentParser(
         description="Concatenate files and print on the standard output."
     )
-    parser.add_argument('-n', action='store_true', help='number all output lines')
-    parser.add_argument('-b', action='store_true', help='number non-empty output lines')
-    parser.add_argument('files', nargs='+', help='files to concatenate')
+
+    parser.add_argument(
+        "-n",
+        action="store_true",
+        help="number all output lines",
+    )
+
+    parser.add_argument(
+        "-b",
+        action="store_true",
+        help="number non-empty output lines",
+    )
+
+    parser.add_argument(
+        "files",
+        nargs="+",
+        help="files to concatenate",
+    )
+
     args = parser.parse_args()
 
     if args.n and args.b:
@@ -51,9 +92,18 @@ def main():
         numbering = Numbering.NONE
 
     line_number = 1
+    success = True
 
-    for file in args.files:
-        line_number = cat(file, numbering=numbering, start_line=line_number)
+    for filepath in args.files:
+        line_number, file_success = cat(
+            filepath,
+            numbering=numbering,
+            start_line=line_number,
+        )
+        success = success and file_success
+
+    return 0 if success else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
