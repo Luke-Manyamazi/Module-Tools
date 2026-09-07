@@ -1,87 +1,147 @@
 import argparse
 import sys
 
-def wc(path, count_lines, count_words, count_bytes):
-    """Count lines, words, and bytes for a single file."""
+
+def wc(path):
     try:
-        with open(path, 'r') as f:
-            content = f.read()
+        with open(path, "rb") as file:
+            content = file.read()
 
-        lines = content.splitlines()
-        words = content.split()
-
-        line_count = len(lines)
-        word_count = len(words)
-        byte_count = len(content.encode('utf-8'))
-
-        if not any([count_lines, count_words, count_bytes]):
-            count_lines = True
-            count_words = True
-            count_bytes = True
-
-        parts = []
-
-        if count_lines:
-            parts.append(str(line_count))
-
-        if count_words:
-            parts.append(str(word_count))
-
-        if count_bytes:
-            parts.append(str(byte_count))
-
-        print(' '.join(parts), path)
+        line_count = content.count(b"\n")
+        word_count = len(content.split())
+        byte_count = len(content)
 
         return line_count, word_count, byte_count
 
     except FileNotFoundError:
         print(
             f"wc: {path}: No such file or directory",
-            file=sys.stderr
+            file=sys.stderr,
         )
-        return (0, 0, 0)
-
     except IsADirectoryError:
         print(
             f"wc: {path}: Is a directory",
-            file=sys.stderr
+            file=sys.stderr,
         )
-        return (0, 0, 0)
+    except PermissionError:
+        print(
+            f"wc: {path}: Permission denied",
+            file=sys.stderr,
+        )
+    except OSError as error:
+        print(
+            f"wc: {path}: {error}",
+            file=sys.stderr,
+        )
+
+    return None
+
+
+def print_stats(
+    line_count,
+    word_count,
+    byte_count,
+    filename,
+    show_lines,
+    show_words,
+    show_bytes,
+):
+    parts = []
+
+    if show_lines:
+        parts.append(f"{line_count:7d}")
+
+    if show_words:
+        parts.append(f"{word_count:7d}")
+
+    if show_bytes:
+        parts.append(f"{byte_count:7d}")
+
+    print("".join(parts), filename)
+
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-l', action='store_true', help='Count lines')
-    parser.add_argument('-w', action='store_true', help='Count words')
-    parser.add_argument('-c', action='store_true', help='Count bytes')
-    parser.add_argument('paths', nargs='+', help='Files to count')
+    parser = argparse.ArgumentParser(
+        description="Print newline, word, and byte counts for files."
+    )
+
+    parser.add_argument(
+        "-l",
+        action="store_true",
+        help="print the newline count",
+    )
+
+    parser.add_argument(
+        "-w",
+        action="store_true",
+        help="print the word count",
+    )
+
+    parser.add_argument(
+        "-c",
+        action="store_true",
+        help="print the byte count",
+    )
+
+    parser.add_argument(
+        "paths",
+        nargs="+",
+        help="files to count",
+    )
+
     args = parser.parse_args()
+
+    # If no options are supplied, wc prints all three counts.
+    show_lines = args.l
+    show_words = args.w
+    show_bytes = args.c
+
+    if not any((show_lines, show_words, show_bytes)):
+        show_lines = True
+        show_words = True
+        show_bytes = True
 
     total_lines = 0
     total_words = 0
     total_bytes = 0
-
-    multiple_files = len(args.paths) > 1
-    show_all = not any([args.l, args.w, args.c])
+    successful_files = 0
 
     for path in args.paths:
-        l, w, b = wc(path, args.l, args.w, args.c)
-        total_lines += l
-        total_words += w
-        total_bytes += b
+        counts = wc(path)
 
-    if multiple_files:
-        parts = []
+        if counts is None:
+            continue
 
-        if args.l or show_all:
-            parts.append(str(total_lines))
+        line_count, word_count, byte_count = counts
 
-        if args.w or show_all:
-            parts.append(str(total_words))
+        total_lines += line_count
+        total_words += word_count
+        total_bytes += byte_count
+        successful_files += 1
 
-        if args.c or show_all:
-            parts.append(str(total_bytes))
+        print_stats(
+            line_count,
+            word_count,
+            byte_count,
+            path,
+            show_lines,
+            show_words,
+            show_bytes,
+        )
 
-        print(' '.join(parts), 'total')
+    if len(args.paths) > 1 and successful_files > 0:
+        print_stats(
+            total_lines,
+            total_words,
+            total_bytes,
+            "total",
+            show_lines,
+            show_words,
+            show_bytes,
+        )
+
+    return 0 if successful_files == len(args.paths) else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
